@@ -81,27 +81,67 @@ async function ensureLocation(){
 }
 
 /* -------- Map helpers -------- */
-function ensureMap(lat,lng){
-  if (!map){
-    map = new google.maps.Map($("#map"), { center:{lat,lng}, zoom:14, mapId: "DEMO_MAP_ID" });
-    userMarker = new google.maps.Marker({ map, position:{lat,lng}, title:"You" });
-  } else {
-    map.setCenter({lat,lng});
-    userMarker.setPosition({lat,lng});
+// --- Map helpers (patch) ---
+// --- Map helpers (robust init) ---
+function ensureMap(lat, lng) {
+  const mapEl = document.getElementById("map");
+  if (!mapEl) return;
+
+  // If the element has 0 width, wait a tick for layout (grid/flex can delay)
+    requestAnimationFrame(() => ensureMap(lat, lng));
+    return;
   }
+
+  if (!window._appMap) {
+    window._appMap = new google.maps.Map(mapEl, {
+      center: { lat, lng },
+      zoom: 14,
+      // remove any placeholder mapId; default style is safest
+      // mapId: "DEMO_MAP_ID",
+      disableDefaultUI: false,
+    });
+
+    // Confirm tiles render at least once
+    google.maps.event.addListenerOnce(window._appMap, "tilesloaded", () => {
+      console.log("✅ Google Map tiles loaded");
+    });
+
+    window._userMarker = new google.maps.Marker({
+      map: window._appMap,
+      position: { lat, lng },
+      title: "You",
+    });
+  } else {
+    window._appMap.setCenter({ lat, lng });
+    if (window._userMarker) window._userMarker.setPosition({ lat, lng });
+  }
+
+  // If parent sizes changed, force a resize & re-center
+  setTimeout(() => {
+    google.maps.event.trigger(window._appMap, "resize");
+    window._appMap.setCenter({ lat, lng });
+  }, 0);
 }
-function clearMarkers(){ markers.forEach(m=>m.setMap(null)); markers=[]; }
-function addMarker(place){
+
+function clearMarkers() {
+  (window._placeMarkers || []).forEach(m => m.setMap(null));
+  window._placeMarkers = [];
+}
+
+function addMarker(place) {
+  if (!window._appMap || !place?.location) return;
   const m = new google.maps.Marker({
-    map,
+    map: window._appMap,
     position: place.location,
-    title: place.name
+    title: place.name,
   });
-  const infowindow = new google.maps.InfoWindow({
-    content: `<strong>${escapeHTML(place.name)}</strong><br/>⭐ ${escapeHTML(String(place.rating))}<br/><small>${escapeHTML(place.vicinity||"")}</small>`
+  const info = new google.maps.InfoWindow({
+    content: `<strong>${escapeHTML(place.name)}</strong><br>
+              ⭐ ${escapeHTML(String(place.rating ?? "N/A"))}<br>
+              <small>${escapeHTML(place.vicinity || "")}</small>`,
   });
-  m.addListener("click", ()=>infowindow.open({anchor:m, map}));
-  markers.push(m);
+  m.addListener("click", () => info.open({ anchor: m, map: window._appMap }));
+  (window._placeMarkers ||= []).push(m);
 }
 
 /* -------- Places search -------- */
@@ -139,24 +179,28 @@ async function findNearby(){
     const {lat,lng,cached} = await ensureLocation();
     setStatus(`📍 ${cached?"Using cached":"Using fresh"} location (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
 
-    ensureMap(lat,lng);
+    // ✅ Make sure the map exists before we draw anything
+    ensureMap(lat, lng);
 
-    let places = await fetchPlaces(lat,lng);
+    let places = await fetchPlaces(lat, lng);
 
-    // Filter client-side
-    const minRating = Number($("#minRating").value || 0);
+    // filters + sorting (keep your current logic)
+    const minRating = Number(document.getElementById("minRating").value || 0);
     places = places.filter(p => (p.rating || 0) >= minRating);
-
-    // Sort
-    const sortBy = $("#sortBy").value || "rating";
-    places.sort((a,b)=>{
-      if (sortBy==="name") return a.name.localeCompare(b.name);
-      if (sortBy==="distance") return a.distance - b.distance;
-      return Number(b.rating||0) - Number(a.rating||0);
+    const sortBy = document.getElementById("sortBy").value || "rating";
+    places.sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "distance") return a.distance - b.distance;
+      return Number(b.rating || 0) - Number(a.rating || 0);
     });
 
     renderResults(places);
-    updateMapMarkers(places);
+
+    // ✅ Refresh markers after rendering
+    clearMarkers();
+    places.slice(0, 30).forEach(p => {
+      if (p.location?.lat && p.location?.lng) addMarker(p);
+    });
 
     setStatus(places.length ? `Found ${places.length} places.` : "No places found.");
   }catch(e){
@@ -178,7 +222,7 @@ function renderResults(list){
 
   if (!list?.length){ showEmpty(true); return; }
   showEmpty(false);
-  
+
   list.forEach(place=>{
     const wrapper = document.createElement("div");
     wrapper.className = "swipe-wrapper";
