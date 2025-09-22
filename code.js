@@ -1,4 +1,3 @@
-// code.js - Complete working solution
 
 // Global variables
 let map, userMarker, markers = [];
@@ -8,6 +7,10 @@ let userLat = null, userLng = null;
 window.addEventListener("DOMContentLoaded", () => {
   console.log("Initializing Cafe Finder...");
   
+  // Ensure loading skeletons are hidden on startup
+  setLoading(false);
+  showEmpty(true);
+
   // Set up event listeners
   document.getElementById("btn-find").addEventListener("click", findNearby);
   document.getElementById("btn-saved").addEventListener("click", showSaved);
@@ -59,9 +62,10 @@ function showEmpty(show) {
 }
 
 function escapeHTML(text) {
-  return String(text).replace(/[&<>"']/g, m => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[m]));
+  if (text === null || text === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // --- Google Maps loader ---
@@ -212,6 +216,7 @@ async function fetchPlaces(lat, lng) {
           name: place.name,
           place_id: place.place_id,
           rating: place.rating ?? "N/A",
+          user_ratings_total: place.user_ratings_total ?? 0,
           photo: place.photos?.[0]?.getUrl({ maxWidth: 640 }) || "https://via.placeholder.com/640x360?text=No+Image",
           vicinity: place.vicinity || "",
           location: {
@@ -275,66 +280,80 @@ async function findNearby() {
 }
 
 // --- Rendering ---
+// --- Card image helpers ---
+function photoImg(place) {
+  // Prefer our simplified string URL (place.photo), fallback to Places Photo object
+  let url = place.photo;
+  if (!url) {
+    const p = place.photos?.[0];
+    url = p?.getUrl?.({ maxWidth: 800, maxHeight: 800 });
+  }
+  if (!url) return "";
+  // lazy-load via data-src and fade-in on load
+  return `<img alt="" loading="lazy" data-src="${url}">`;
+}
+
+function createCard(place) {
+  const div = document.createElement("article");
+  div.className = "location-card swipe-wrapper";
+  div.innerHTML = `
+    ${photoImg(place)}
+    <h3>${escapeHTML(place.name || "Unnamed place")}</h3>
+    <div class="card-row">
+      <span class="chip chip--accent">⭐ ${place.rating ?? "—"} · ${place.user_ratings_total ?? 0}</span>
+      <div class="card-actions">
+        <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.place_id}" target="_blank" rel="noopener">Directions</a>
+        <a href="#" data-save>Save</a>
+      </div>
+    </div>
+    <div class="card-row" style="margin-top:8px">
+      <span class="chip">${(place.vicinity || place.formatted_address || "").replaceAll(",", " · ")}</span>
+    </div>
+  `;
+
+  // 👉 fade the actual <img> in when it loads
+  const img = div.querySelector("img[data-src]");
+  if (img) {
+    img.addEventListener("load", () => img.classList.add("is-loaded"), { once: true });
+    img.src = img.dataset.src;
+  }
+
+  // Save button
+  const saveBtn = div.querySelector("[data-save]");
+  if (saveBtn) {
+    saveBtn.addEventListener("click", e => {
+      e.preventDefault();
+      savePlace(place);
+    });
+  }
+
+  // Swipe functionality
+  if (window.Hammer) {
+    const hammer = new Hammer(div);
+    hammer.get("swipe").set({ direction: Hammer.DIRECTION_HORIZONTAL });
+    hammer.on("swiperight", () => {
+      savePlace(place);
+      slideAway(div, 1);
+    });
+    hammer.on("swipeleft", () => {
+      slideAway(div, -1);
+    });
+  }
+
+  return div;
+}
+
 function renderResults(places) {
   const container = document.querySelector(".cards");
   if (!container) return;
-  
   container.innerHTML = "";
-  
   if (!places?.length) {
     showEmpty(true);
     return;
   }
-  
   showEmpty(false);
-  
   places.forEach(place => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "swipe-wrapper";
-    
-    const card = document.createElement("div");
-    card.className = "location-card";
-    
-    const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.place_id}`;
-    const distanceKm = place.distance ? (place.distance / 1000).toFixed(1) + ' km' : 'Unknown';
-    
-    card.innerHTML = `
-      <img src="${place.photo}" alt="${escapeHTML(place.name)}" loading="lazy" />
-      <div class="card-row">
-        <h3>${escapeHTML(place.name)}</h3>
-        <span class="chip">⭐ ${escapeHTML(String(place.rating))}</span>
-      </div>
-      <div class="card-row">
-        <small>${escapeHTML(place.vicinity || "")}</small>
-        <span class="chip">${distanceKm}</span>
-      </div>
-      <div class="card-actions">
-        <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer">Directions</a>
-        <span class="chip chip--accent save-btn">Save</span>
-      </div>
-    `;
-    
-    // Save button
-    const saveBtn = card.querySelector(".save-btn");
-    if (saveBtn) {
-      saveBtn.addEventListener("click", () => savePlace(place));
-    }
-    
-    // Swipe functionality
-    if (window.Hammer) {
-      const hammer = new Hammer(card);
-      hammer.get("swipe").set({ direction: Hammer.DIRECTION_HORIZONTAL });
-      hammer.on("swiperight", () => {
-        savePlace(place);
-        slideAway(wrapper, 1);
-      });
-      hammer.on("swipeleft", () => {
-        slideAway(wrapper, -1);
-      });
-    }
-    
-    wrapper.appendChild(card);
-    container.appendChild(wrapper);
+    container.appendChild(createCard(place));
   });
 }
 
