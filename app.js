@@ -2,6 +2,8 @@ document.getElementById('btn-find').addEventListener('click', getLocation);
 document.getElementById('btn-saved').addEventListener('click', showSaved);
 
 function getLocation() {
+  const loading = document.getElementById('loading');
+  loading.hidden = false;
   const cache = JSON.parse(localStorage.getItem('cachedLocation') || '{}');
   const now = Date.now();
 
@@ -15,7 +17,10 @@ function getLocation() {
         localStorage.setItem('cachedLocation', JSON.stringify({ lat, lng, timestamp: now }));
         useLocation(lat, lng);
       },
-      () => alert("Location access denied or unavailable.")
+      () => {
+        loading.hidden = true;
+        alert("Location access denied or unavailable.");
+      }
     );
   }
 }
@@ -24,13 +29,16 @@ async function useLocation(lat, lng) {
   const endpoint = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=1500&type=cafe&key=${apiKey}`;
   const url = useProxy ? (proxy + endpoint) : endpoint;
 
+  const loading = document.getElementById('loading');
   try {
     // If using cors-anywhere demo, you must click “Request temporary access” first
     const res = await fetch(url);
     const data = await res.json();
+    loading.hidden = true;
     if (data.results) displayCards(data.results);
     else alert("No cafes found.");
   } catch (e) {
+    loading.hidden = true;
     console.error("Error fetching Places API:", e);
     alert("Error fetching cafes.");
   }
@@ -39,8 +47,10 @@ async function useLocation(lat, lng) {
 function displayCards(cafes) {
   const container = document.querySelector('.cards');
   container.innerHTML = '';
+  const loading = document.getElementById('loading');
+  loading.hidden = true;
 
-  cafes.forEach((cafe, i) => {
+  cafes.filter(cafe => cafe && cafe.name && (cafe.photos?.[0]?.photo_reference)).forEach((cafe, i) => {
     const wrapper = document.createElement('div');
     wrapper.className = 'swipe-wrapper';
     wrapper.style.zIndex = 200 - i;
