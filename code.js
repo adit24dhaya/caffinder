@@ -88,6 +88,7 @@ function ensureMap(lat, lng) {
   if (!mapEl) return;
 
   // If the element has 0 width, wait a tick for layout (grid/flex can delay)
+  if (mapEl.offsetWidth === 0) {
     requestAnimationFrame(() => ensureMap(lat, lng));
     return;
   }
