@@ -50,12 +50,7 @@ body{
 .brand{
   font-weight:700; font-size:24px; display:flex; align-items:center; gap:10px;
 }
-.brand::before{
-  content:"🫖";
-  display:inline-flex; align-items:center; justify-content:center;
-  width:28px; height:28px; border-radius:10px; background:var(--accent); color:white;
-  box-shadow: var(--shadow-sm);
-}
+
 .actions{display:flex; gap:10px}
 
 /* ====== Buttons ====== */
