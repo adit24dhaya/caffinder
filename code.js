@@ -1,174 +1,303 @@
-/* -------- State -------- */
-let mapsReadyPromise = null;
+// code.js - Complete working solution
+
+// Global variables
 let map, userMarker, markers = [];
 let userLat = null, userLng = null;
 
+// Wire up buttons and initialize
 window.addEventListener("DOMContentLoaded", () => {
-  $("#btn-find").addEventListener("click", findNearby);
-  $("#btn-saved").addEventListener("click", showSaved);
+  console.log("Initializing Cafe Finder...");
+  
+  // Set up event listeners
+  document.getElementById("btn-find").addEventListener("click", findNearby);
+  document.getElementById("btn-saved").addEventListener("click", showSaved);
 
-  // Controls trigger re-search after first search
-  ["type","radius","minRating","openNow","sortBy"].forEach(id => {
-    const el = $("#"+id);
+  // Set up filter change listeners
+  ["type", "radius", "minRating", "openNow", "sortBy"].forEach(id => {
+    const el = document.getElementById(id);
     if (el) el.addEventListener("change", () => {
       if (userLat != null) findNearby(); // re-run with new filters
     });
   });
 
-  mapsReadyPromise = loadGoogleMaps(CONFIG.GOOGLE_MAPS_API_KEY)
-    .then(() => setStatus("✅ Maps ready. Tap Find Nearby."))
-    .catch(e => { console.error(e); setStatus("❌ Failed to load Maps."); });
+  // Load Google Maps
+  loadGoogleMaps(CONFIG.GOOGLE_MAPS_API_KEY)
+    .then(() => {
+      console.log("✅ Google Maps loaded successfully");
+      setStatus("✅ Maps ready. Tap Find Nearby to search.");
+    })
+    .catch(err => {
+      console.error("❌ Failed to load Google Maps:", err);
+      setStatus("❌ Failed to load Maps. Check console for details.");
+    });
 
   setLoading(false);
   showEmpty(true);
 });
 
-/* -------- DOM helpers -------- */
-function $(s){return document.querySelector(s)}
-function setStatus(t){ const el=$("#status"); if(el) el.textContent=t||""; }
-function setLoading(on){
-  $("#loading").hidden = !on;
-  $(".cards").setAttribute("aria-busy", on ? "true":"false");
-  if (on) showEmpty(false);
+// --- DOM helpers ---
+function setStatus(text) {
+  const statusEl = document.getElementById("status");
+  if (statusEl) statusEl.textContent = text || "";
 }
-function showEmpty(on){ const el=$("#empty"); if(el) el.hidden = !on; }
-function escapeHTML(s=""){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
-/* -------- Google Maps loader -------- */
-function loadGoogleMaps(key){
-  return new Promise((resolve,reject)=>{
+function setLoading(loading) {
+  const loadingEl = document.getElementById("loading");
+  const cardsEl = document.querySelector(".cards");
+  
+  if (loadingEl) loadingEl.hidden = !loading;
+  if (cardsEl) cardsEl.setAttribute("aria-busy", loading ? "true" : "false");
+  
+  if (loading) {
+    showEmpty(false);
+  }
+}
+
+function showEmpty(show) {
+  const emptyEl = document.getElementById("empty");
+  if (emptyEl) emptyEl.hidden = !show;
+}
+
+function escapeHTML(text) {
+  return String(text).replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[m]));
+}
+
+// --- Google Maps loader ---
+function loadGoogleMaps(apiKey) {
+  return new Promise((resolve, reject) => {
     if (window.google?.maps?.places) return resolve();
-    const sc=document.createElement("script");
-    sc.async=true; sc.defer=true;
-    sc.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places`;
-    sc.onload=()=>window.google?.maps?.places?resolve():reject(new Error("Places missing"));
-    sc.onerror=reject;
-    document.head.appendChild(sc);
+    
+    const script = document.createElement("script");
+    script.async = true;
+    script.defer = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
+    script.onload = () => window.google?.maps?.places ? resolve() : reject(new Error("Places library missing"));
+    script.onerror = reject;
+    document.head.appendChild(script);
   });
 }
 
-/* -------- Geolocation (10-min cache) -------- */
-async function ensureLocation(){
-  const cache = JSON.parse(localStorage.getItem("cachedLocation")||"{}");
+// --- Geolocation with 10-min cache ---
+async function ensureLocation() {
+  const cache = JSON.parse(localStorage.getItem("cachedLocation") || "{}");
   const now = Date.now();
-  if (cache.timestamp && now-cache.timestamp < 10*60*1000){
-    userLat=cache.lat; userLng=cache.lng;
-    return {lat:userLat, lng:userLng, cached:true};
+  
+  if (cache.timestamp && now - cache.timestamp < 10 * 60 * 1000) {
+    userLat = cache.lat;
+    userLng = cache.lng;
+    return { lat: userLat, lng: userLng, cached: true };
   }
+  
   setStatus("Requesting location…");
-  return new Promise((res,rej)=>{
-    navigator.geolocation.getCurrentPosition(pos=>{
-      userLat=pos.coords.latitude; userLng=pos.coords.longitude;
-      localStorage.setItem("cachedLocation", JSON.stringify({lat:userLat,lng:userLng,timestamp:now}));
-      res({lat:userLat,lng:userLng,cached:false});
-    },()=>rej(new Error("Location denied/unavailable.")));
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation not supported"));
+      return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        userLat = pos.coords.latitude;
+        userLng = pos.coords.longitude;
+        localStorage.setItem("cachedLocation", JSON.stringify({
+          lat: userLat,
+          lng: userLng,
+          timestamp: now
+        }));
+        resolve({ lat: userLat, lng: userLng, cached: false });
+      },
+      error => {
+        let errorMsg = "Location access denied or unavailable";
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMsg = "Location permission denied. Please enable location access.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMsg = "Location information unavailable.";
+            break;
+          case error.TIMEOUT:
+            errorMsg = "Location request timed out.";
+            break;
+        }
+        reject(new Error(errorMsg));
+      },
+      { timeout: 10000 }
+    );
   });
 }
 
-/* -------- Map helpers -------- */
-function ensureMap(lat,lng){
-  if (!map){
-    map = new google.maps.Map($("#map"), { center:{lat,lng}, zoom:14, mapId: "DEMO_MAP_ID" });
-    userMarker = new google.maps.Marker({ map, position:{lat,lng}, title:"You" });
-  } else {
-    map.setCenter({lat,lng});
-    userMarker.setPosition({lat,lng});
+// --- Map helpers ---
+function ensureMap(lat, lng) {
+  const mapEl = document.getElementById("map");
+  if (!mapEl) return;
+  
+  if (mapEl.offsetWidth === 0) {
+    requestAnimationFrame(() => ensureMap(lat, lng));
+    return;
   }
+  
+  if (!map) {
+    map = new google.maps.Map(mapEl, {
+      center: { lat, lng },
+      zoom: 14,
+      disableDefaultUI: false,
+    });
+    
+    userMarker = new google.maps.Marker({
+      map,
+      position: { lat, lng },
+      title: "You"
+    });
+    
+    google.maps.event.addListenerOnce(map, "tilesloaded", () => {
+      console.log("✅ Google Map tiles loaded");
+    });
+  } else {
+    map.setCenter({ lat, lng });
+    userMarker.setPosition({ lat, lng });
+  }
+  
+  setTimeout(() => {
+    google.maps.event.trigger(map, "resize");
+    map.setCenter({ lat, lng });
+  }, 0);
 }
-function clearMarkers(){ markers.forEach(m=>m.setMap(null)); markers=[]; }
-function addMarker(place){
-  const m = new google.maps.Marker({
+
+function clearMarkers() {
+  markers.forEach(marker => marker.setMap(null));
+  markers = [];
+}
+
+function addMarker(place) {
+  if (!map || !place?.location) return;
+  
+  const marker = new google.maps.Marker({
     map,
     position: place.location,
     title: place.name
   });
+  
   const infowindow = new google.maps.InfoWindow({
-    content: `<strong>${escapeHTML(place.name)}</strong><br/>⭐ ${escapeHTML(String(place.rating))}<br/><small>${escapeHTML(place.vicinity||"")}</small>`
+    content: `
+      <strong>${escapeHTML(place.name)}</strong><br/>
+      ⭐ ${escapeHTML(String(place.rating))}<br/>
+      <small>${escapeHTML(place.vicinity || "")}</small>
+    `
   });
-  m.addListener("click", ()=>infowindow.open({anchor:m, map}));
-  markers.push(m);
+  
+  marker.addListener("click", () => infowindow.open({ anchor: marker, map }));
+  markers.push(marker);
 }
 
-/* -------- Places search -------- */
-async function fetchPlaces(lat,lng){
-  await mapsReadyPromise;
-  const type = $("#type").value || DEFAULTS.type;
-  const radius = Number($("#radius").value || DEFAULTS.radius);
-  const openNow = $("#openNow").checked || DEFAULTS.openNow;
-
-  return new Promise(resolve=>{
-    const svc = new google.maps.places.PlacesService(document.createElement("div"));
-    const req = { location: new google.maps.LatLng(lat,lng), radius, type, openNow };
-    svc.nearbySearch(req, (results, status)=>{
-      if (status === google.maps.places.PlacesServiceStatus.OK && results?.length){
-        const items = results.map(p=>({
-          name: p.name,
-          place_id: p.place_id,
-          rating: p.rating ?? "N/A",
-          photo: p.photos?.[0]?.getUrl({maxWidth:640}) || "https://via.placeholder.com/640x360?text=No+Image",
-          vicinity: p.vicinity || "",
-          location: { lat: p.geometry?.location?.lat(), lng: p.geometry?.location?.lng() },
-          distance: distanceMeters(lat,lng, p.geometry?.location?.lat(), p.geometry?.location?.lng())
+// --- Places search ---
+async function fetchPlaces(lat, lng) {
+  const type = document.getElementById("type").value || "cafe";
+  const radius = Number(document.getElementById("radius").value || 1500);
+  const openNow = document.getElementById("openNow").checked || false;
+  
+  return new Promise(resolve => {
+    const service = new google.maps.places.PlacesService(document.createElement("div"));
+    const request = {
+      location: new google.maps.LatLng(lat, lng),
+      radius,
+      type,
+      openNow
+    };
+    
+    service.nearbySearch(request, (results, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && results?.length) {
+        const places = results.map(place => ({
+          name: place.name,
+          place_id: place.place_id,
+          rating: place.rating ?? "N/A",
+          photo: place.photos?.[0]?.getUrl({ maxWidth: 640 }) || "https://via.placeholder.com/640x360?text=No+Image",
+          vicinity: place.vicinity || "",
+          location: {
+            lat: place.geometry?.location?.lat(),
+            lng: place.geometry?.location?.lng()
+          },
+          distance: calculateDistance(lat, lng, place.geometry?.location?.lat(), place.geometry?.location?.lng())
         }));
-        resolve(items);
-      } else resolve([]);
+        resolve(places);
+      } else {
+        console.log("Places API status:", status);
+        resolve([]);
+      }
     });
   });
 }
 
-/* -------- Orchestrator -------- */
-async function findNearby(){
-  try{
+// --- Main search function ---
+async function findNearby() {
+  try {
     setLoading(true);
-    await mapsReadyPromise;
-    const {lat,lng,cached} = await ensureLocation();
-    setStatus(`📍 ${cached?"Using cached":"Using fresh"} location (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
-
-    ensureMap(lat,lng);
-
-    let places = await fetchPlaces(lat,lng);
-
-    // Filter client-side
-    const minRating = Number($("#minRating").value || 0);
-    places = places.filter(p => (p.rating || 0) >= minRating);
-
-    // Sort
-    const sortBy = $("#sortBy").value || "rating";
-    places.sort((a,b)=>{
-      if (sortBy==="name") return a.name.localeCompare(b.name);
-      if (sortBy==="distance") return a.distance - b.distance;
-      return Number(b.rating||0) - Number(a.rating||0);
+    setStatus("Finding your location…");
+    
+    const { lat, lng, cached } = await ensureLocation();
+    setStatus(`📍 ${cached ? "Using cached" : "Using fresh"} location (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+    
+    ensureMap(lat, lng);
+    
+    let places = await fetchPlaces(lat, lng);
+    
+    // Apply filters
+    const minRating = Number(document.getElementById("minRating").value || 0);
+    places = places.filter(place => {
+      const rating = Number(place.rating);
+      return !isNaN(rating) && rating >= minRating;
     });
-
+    
+    // Apply sorting
+    const sortBy = document.getElementById("sortBy").value || "rating";
+    places.sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "distance") return a.distance - b.distance;
+      
+      const ratingA = Number(a.rating) || 0;
+      const ratingB = Number(b.rating) || 0;
+      return ratingB - ratingA;
+    });
+    
     renderResults(places);
     updateMapMarkers(places);
-
+    
     setStatus(places.length ? `Found ${places.length} places.` : "No places found.");
-  }catch(e){
-    console.error(e);
-    setStatus(`❌ ${e.message || e}`);
+    
+  } catch (error) {
+    console.error("Error in findNearby:", error);
+    setStatus(`❌ ${error.message || "Something went wrong"}`);
     renderResults([]);
-  }finally{
+  } finally {
     setLoading(false);
   }
 }
 
-/* -------- Rendering -------- */
-function renderResults(list){
-  const container = $(".cards");
+// --- Rendering ---
+function renderResults(places) {
+  const container = document.querySelector(".cards");
+  if (!container) return;
+  
   container.innerHTML = "";
-
-  if (!list?.length){ showEmpty(true); return; }
+  
+  if (!places?.length) {
+    showEmpty(true);
+    return;
+  }
+  
   showEmpty(false);
-
-  list.forEach(place=>{
+  
+  places.forEach(place => {
     const wrapper = document.createElement("div");
     wrapper.className = "swipe-wrapper";
-
+    
     const card = document.createElement("div");
     card.className = "location-card";
+    
     const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.place_id}`;
+    const distanceKm = place.distance ? (place.distance / 1000).toFixed(1) + ' km' : 'Unknown';
+    
     card.innerHTML = `
       <img src="${place.photo}" alt="${escapeHTML(place.name)}" loading="lazy" />
       <div class="card-row">
@@ -177,45 +306,59 @@ function renderResults(list){
       </div>
       <div class="card-row">
         <small>${escapeHTML(place.vicinity || "")}</small>
-        <div class="card-actions">
-          <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer">Directions</a>
-          <span class="chip chip--accent save-btn">Save</span>
-        </div>
+        <span class="chip">${distanceKm}</span>
+      </div>
+      <div class="card-actions">
+        <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer">Directions</a>
+        <span class="chip chip--accent save-btn">Save</span>
       </div>
     `;
-
+    
     // Save button
-    card.querySelector(".save-btn").addEventListener("click", ()=>savePlace(place));
-    // Swipe (touch only, horizontal)
-    if (isTouch && window.Hammer){
-      const h = new Hammer(card);
-      h.get("swipe").set({ direction: Hammer.DIRECTION_HORIZONTAL });
-      h.on("swiperight", ()=>{ savePlace(place); slideAway(wrapper, +1); });
-      h.on("swipeleft",  ()=>{ slideAway(wrapper, -1); });
+    const saveBtn = card.querySelector(".save-btn");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => savePlace(place));
     }
-
+    
+    // Swipe functionality
+    if (window.Hammer) {
+      const hammer = new Hammer(card);
+      hammer.get("swipe").set({ direction: Hammer.DIRECTION_HORIZONTAL });
+      hammer.on("swiperight", () => {
+        savePlace(place);
+        slideAway(wrapper, 1);
+      });
+      hammer.on("swipeleft", () => {
+        slideAway(wrapper, -1);
+      });
+    }
+    
     wrapper.appendChild(card);
     container.appendChild(wrapper);
   });
 }
 
-function slideAway(el, dir=1){
-  el.style.transform = `translateX(${dir*120}%) rotate(${dir*8}deg)`;
-  el.style.opacity = "0";
-  setTimeout(()=>el.remove(), 160);
+function slideAway(element, direction = 1) {
+  element.style.transform = `translateX(${direction * 120}%) rotate(${direction * 8}deg)`;
+  element.style.opacity = "0";
+  setTimeout(() => {
+    if (element.parentNode) element.parentNode.removeChild(element);
+  }, 160);
 }
 
-function updateMapMarkers(places){
+function updateMapMarkers(places) {
   clearMarkers();
-  places.slice(0, 30).forEach(p=>{
-    if (p.location?.lat && p.location?.lng) addMarker(p);
+  places.slice(0, 30).forEach(place => {
+    if (place.location?.lat && place.location?.lng) {
+      addMarker(place);
+    }
   });
 }
 
-/* -------- Saved -------- */
-function savePlace(place){
+// --- Saved places ---
+function savePlace(place) {
   const saved = JSON.parse(localStorage.getItem("savedPlaces") || "[]");
-  if (!saved.find(s => s.place_id === place.place_id)){
+  if (!saved.find(p => p.place_id === place.place_id)) {
     saved.push(place);
     localStorage.setItem("savedPlaces", JSON.stringify(saved));
     alert(`Saved: ${place.name}`);
@@ -223,18 +366,26 @@ function savePlace(place){
     alert(`${place.name} is already saved.`);
   }
 }
-function showSaved(){
+
+function showSaved() {
   const saved = JSON.parse(localStorage.getItem("savedPlaces") || "[]");
   renderResults(saved);
-  setStatus(saved.length ? `You have ${saved.length} saved.` : "No saved places yet.");
+  setStatus(saved.length ? `You have ${saved.length} saved places.` : "No saved places yet.");
 }
 
-/* -------- Utils -------- */
-function distanceMeters(lat1,lng1,lat2,lng2){
-  if (lat2==null || lng2==null) return Infinity;
-  const R=6371000; // m
-  const toRad = d=>d*Math.PI/180;
-  const dlat=toRad(lat2-lat1), dlng=toRad(lng2-lng1);
-  const a=Math.sin(dlat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dlng/2)**2;
-  return 2*R*Math.asin(Math.sqrt(a));
+// --- Utility functions ---
+function calculateDistance(lat1, lng1, lat2, lng2) {
+  if (lat2 == null || lng2 == null) return Infinity;
+  
+  const R = 6371000; // Earth radius in meters
+  const toRad = degrees => degrees * Math.PI / 180;
+  
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLng / 2) ** 2;
+  
+  return 2 * R * Math.asin(Math.sqrt(a));
 }
