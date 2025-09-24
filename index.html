@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
+  <!-- HammerJS for swipe-to-save -->
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
 </head>
 <body>
@@ -18,6 +19,7 @@
       <nav class="actions" aria-label="primary">
         <button id="btn-find" class="btn btn-primary" type="button">🔎 Find Nearby</button>
         <button id="btn-saved" class="btn" type="button">💖 Saved</button>
+        <button id="btn-surprise" class="btn" type="button">🎲 Surprise Me</button>
       </nav>
     </div>
   </header>
@@ -79,11 +81,11 @@
       <div class="column">
         <h2 class="section-title">Results</h2>
 
-      <div id="loading" class="skeletons" hidden>
-        <div class="skeleton-card"></div>
-        <div class="skeleton-card"></div>
-        <div class="skeleton-card"></div>
-      </div>
+        <div id="loading" class="skeletons" hidden>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+        </div>
 
         <div class="cards" aria-live="polite" aria-busy="false"></div>
 
@@ -94,7 +96,8 @@
         </div>
       </div>
 
-      <div class="column">
+      <!-- Sticky, narrower map column -->
+      <div class="column column--map">
         <h2 class="section-title">Map</h2>
         <div id="map" class="map"></div>
       </div>
@@ -107,7 +110,10 @@
     </div>
   </footer>
 
+  <!-- Your config should expose window.CONFIG.GMAPS_API_KEY -->
   <script src="config.js"></script>
+  <!-- Confetti for "Surprise Me" -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="code.js"></script>
 </body>
 </html>
