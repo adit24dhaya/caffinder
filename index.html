@@ -1,120 +1,128 @@
-<!--HTML FILE-->
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
   <title>Cafe Finder</title>
-
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-
+  <link href="styles.css" rel="stylesheet" />
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js" type="module"></script>
+  <link href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" rel="stylesheet" />
   <!-- HammerJS for swipe-to-save -->
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
 </head>
+
 <body>
   <header class="site-header">
     <div class="wrap">
       <h1 class="brand">☕ Cafe Finder</h1>
-      <nav class="actions" aria-label="primary">
-        <button id="btn-find" class="btn btn-primary" type="button">🔎 Find Nearby</button>
-        <button id="btn-saved" class="btn" type="button">💖 Saved</button>
-        <button id="btn-surprise" class="btn" type="button">🎲 Surprise Me</button>
+      <nav aria-label="primary" class="actions">
+        <button class="btn btn-primary" id="btn-find" type="button">🔎 Find Nearby</button>
+        <button class="btn" id="btn-saved" type="button">💖 Saved</button>
+        <button class="btn" id="btn-surprise" type="button">🎲 Surprise Me</button>
       </nav>
     </div>
   </header>
-
   <main class="site-main">
     <section class="controls wrap">
       <div class="control-row">
         <label class="control">
           <span class="control-label">Type</span>
-          <select id="type" class="select">
-            <option value="cafe" selected>Café</option>
-            <option value="restaurant">Restaurant</option>
-            <option value="park">Park</option>
-            <option value="museum">Museum</option>
-            <option value="tourist_attraction">Attraction</option>
-            <option value="book_store">Book Store</option>
-          </select>
+          <sl-select hoist="" id="type" value="cafe">
+            <sl-option value="cafe">Café</sl-option>
+            <sl-option value="restaurant">Restaurant</sl-option>
+            <sl-option value="park">Park</sl-option>
+            <sl-option value="museum">Museum</sl-option>
+            <sl-option value="tourist_attraction">Attraction</sl-option>
+            <sl-option value="book_store">Book Store</sl-option>
+          </sl-select>
         </label>
-
         <label class="control">
           <span class="control-label">Radius</span>
-          <select id="radius" class="select">
-            <option value="1000">1 km</option>
-            <option value="1500" selected>1.5 km</option>
-            <option value="3000">3 km</option>
-            <option value="5000">5 km</option>
-          </select>
+          <sl-select hoist="" id="radius" value="1500">
+            <sl-option value="1000">1 km</sl-option>
+            <sl-option value="1500">1.5 km</sl-option>
+            <sl-option value="3000">3 km</sl-option>
+            <sl-option value="5000">5 km</sl-option>
+          </sl-select>
         </label>
-
         <label class="control">
           <span class="control-label">Min rating</span>
-          <select id="minRating" class="select">
-            <option value="0" selected>Any</option>
-            <option value="3">3.0+</option>
-            <option value="4">4.0+</option>
-            <option value="4.5">4.5+</option>
-          </select>
+          <sl-select hoist="" id="minRating" value="0">
+            <sl-option value="0">Any</sl-option>
+            <sl-option value="3">3.0+</sl-option>
+            <sl-option value="4">4.0+</sl-option>
+            <sl-option value="4.5">4.5+</sl-option>
+          </sl-select>
         </label>
-
-        <label class="control switch">
-          <input id="openNow" type="checkbox" />
-          <span>Open now</span>
-        </label>
-
         <label class="control">
           <span class="control-label">Sort by</span>
-          <select id="sortBy" class="select">
-            <option value="rating" selected>Rating</option>
-            <option value="name">Name</option>
-            <option value="distance">Distance</option>
-          </select>
+          <sl-select hoist="" id="sortBy" value="rating">
+            <sl-option value="rating">Rating</sl-option>
+            <sl-option value="name">Name</sl-option>
+            <sl-option value="distance">Distance</sl-option>
+          </sl-select>
+        </label>
+        <label class="control switch">
+            <span class="control-label">Status</span>
+          <sl-switch id="openNow">Open now</sl-switch>
         </label>
       </div>
-
-      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p aria-live="polite" class="status" id="status" role="status"></p>
     </section>
-
     <section class="layout wrap">
       <div class="column">
         <h2 class="section-title">Results</h2>
-
-        <div id="loading" class="skeletons" hidden>
+        <div class="skeletons" hidden="" id="loading">
           <div class="skeleton-card"></div>
           <div class="skeleton-card"></div>
           <div class="skeleton-card"></div>
         </div>
-
-        <div class="cards" aria-live="polite" aria-busy="false"></div>
-
-        <div id="empty" class="empty" hidden>
+        <div aria-busy="false" aria-live="polite" class="cards"></div>
+        <div class="empty" hidden="" id="empty">
           <div class="empty-emoji">🍩</div>
           <h3>No places yet</h3>
           <p>Tap <strong>Find Nearby</strong> to search around you.</p>
         </div>
       </div>
-
       <!-- Sticky, narrower map column -->
       <div class="column column--map">
         <h2 class="section-title">Map</h2>
-        <div id="map" class="map"></div>
+        <div class="map" id="map"></div>
       </div>
     </section>
   </main>
-
   <footer class="site-footer">
     <div class="wrap">
       <small>Swipe right to save • Click a card for directions</small>
     </div>
   </footer>
-
   <!-- Your config should expose window.CONFIG.GMAPS_API_KEY -->
   <script src="config.js"></script>
   <!-- Confetti for "Surprise Me" -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const selects = document.querySelectorAll("select.select");
+      selects.forEach(sel => {
+        new Choices(sel, {
+          searchEnabled: false,
+          shouldSort: false,
+          itemSelectText: "",
+        });
+      });
+    });
+  </script>
   <script src="code.js"></script>
+  <div class="lightbox" id="lightbox">
+    <span class="lightbox-close">×</span>
+    <img alt="Preview" id="lightbox-img" src="" />
+  </div>
 </body>
+
 </html>

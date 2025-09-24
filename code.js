@@ -7,19 +7,19 @@
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-  const elStatus   = $('#status');
-  const elCards    = $('.cards');
-  const elLoading  = $('#loading');
-  const elEmpty    = $('#empty');
-  const btnFind    = $('#btn-find');
-  const btnSaved   = $('#btn-saved');
-  const btnSurprise= $('#btn-surprise');
+  const elStatus = $('#status');
+  const elCards = $('.cards');
+  const elLoading = $('#loading');
+  const elEmpty = $('#empty');
+  const btnFind = $('#btn-find');
+  const btnSaved = $('#btn-saved');
+  const btnSurprise = $('#btn-surprise');
 
-  const selType    = $('#type');
-  const selRadius  = $('#radius');
+  const selType = $('#type');
+  const selRadius = $('#radius');
   const selMinRate = $('#minRating');
   const chkOpenNow = $('#openNow');
-  const selSortBy  = $('#sortBy');
+  const selSortBy = $('#sortBy');
 
   // Local storage keys
   const LS_SAVED = 'cafefinder_saved_v1';
@@ -115,12 +115,12 @@
     map.fitBounds(bounds);
   }
 
-  function closeAllInfoWindows(){
+  function closeAllInfoWindows() {
     infoWindows.forEach(iw => iw && iw.close && iw.close());
   }
-  function focusPlace(placeId){
+  function focusPlace(placeId) {
     const entry = markersById[placeId];
-    if(!entry) return;
+    if (!entry) return;
     const { marker, infowindow } = entry;
     closeAllInfoWindows();
     map.setZoom(Math.max(map.getZoom() || 14, 16));
@@ -176,15 +176,15 @@
   }
 
   function buildCard(place, details = {}) {
-    const name   = escapeHtml(place.name || '');
+    const name = escapeHtml(place.name || '');
     const vicinity = escapeHtml(place.vicinity || place.formatted_address || '');
     const rating = place.rating || details.rating;
-    const total  = place.user_ratings_total || details.user_ratings_total;
-    const saved  = isSaved(place.place_id);
-    const url    = details.url || `https://www.google.com/maps/place/?q=place_id:${place.place_id}`;
+    const total = place.user_ratings_total || details.user_ratings_total;
+    const saved = isSaved(place.place_id);
+    const url = details.url || `https://www.google.com/maps/place/?q=place_id:${place.place_id}`;
 
     const photos = (details.photos && details.photos.length ? details.photos : (place.photos || []));
-    const reviews= details.reviews || [];
+    const reviews = details.reviews || [];
 
     return `<article class="card location-card" data-id="${place.place_id}">
       ${buildPhotoStrip(photos)}
@@ -254,7 +254,7 @@
         const id = card.getAttribute('data-id');
         const nowSaved = toggleSaved(id);
         const btn = $('.btn-save', card);
-        if (btn){ btn.textContent = nowSaved ? 'Saved' : 'Save'; btn.classList.toggle('is-saved', nowSaved); btn.classList.remove('danger-hover'); }
+        if (btn) { btn.textContent = nowSaved ? 'Saved' : 'Save'; btn.classList.toggle('is-saved', nowSaved); btn.classList.remove('danger-hover'); }
         card.classList.add('highlight');
         setTimeout(() => card.classList.remove('highlight'), 1200);
       });
@@ -270,12 +270,12 @@
   function computeDistanceMeters(a, b) {
     if (!a || !b) return null;
     const R = 6371000;
-    const dLat = (b.lat - a.lat) * Math.PI/180;
-    const dLng = (b.lng - a.lng) * Math.PI/180;
-    const lat1 = a.lat * Math.PI/180;
-    const lat2 = b.lat * Math.PI/180;
-    const x = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
-    const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+    const dLat = (b.lat - a.lat) * Math.PI / 180;
+    const dLng = (b.lng - a.lng) * Math.PI / 180;
+    const lat1 = a.lat * Math.PI / 180;
+    const lat2 = b.lat * Math.PI / 180;
+    const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
     return R * c;
   }
 
@@ -334,7 +334,7 @@
     const nearbyResults = await new Promise((resolve, reject) => {
       placesService.nearbySearch(nearbyReq, (results, status) => {
         if (status !== maps.places.PlacesServiceStatus.OK &&
-            status !== maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+          status !== maps.places.PlacesServiceStatus.ZERO_RESULTS) {
           reject(new Error('Places nearbySearch failed: ' + status));
           return;
         }
@@ -504,5 +504,27 @@
     initControls();
     setStatus('Ready. Tap “Find Nearby” to begin.');
   })();
+
+  // ===== Wire up controls =====
+  function initControls() {
+    btnFind.addEventListener('click', () => performSearch(true));
+    btnSurprise.addEventListener('click', surpriseMe);
+    btnSaved.addEventListener('click', () => {
+      const now = !showingSavedOnly;
+      btnSaved.classList.toggle('btn-primary', now);
+      showSavedOnly(now);
+    });
+
+    // Shoelace-compatible change listeners
+    const ids = ['type', 'radius', 'minRating', 'openNow', 'sortBy'];
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const rerun = () => { if (map) performSearch(false); };
+      el.addEventListener('sl-change', rerun); // Shoelace event
+      el.addEventListener('change', rerun);    // Fallback (just in case)
+    });
+  }
+
 
 })();
