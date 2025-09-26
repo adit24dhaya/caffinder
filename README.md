@@ -73,6 +73,10 @@ Then open [http://localhost:5173](http://localhost:5173) in your browser.
 ---
 
 ## 📸 Screenshots
+![Demo Screenshot](caffinder/screenshots/S-1.png)
+![Demo Screenshot](caffinder/screenshots/S-2.png)
+![Demo Screenshot](caffinder/screenshots/S-3.png)
+
 
 ---
 
